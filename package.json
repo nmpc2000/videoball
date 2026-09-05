@@ -1,12 +1,18 @@
 {
-  "name": "coach-vision-complete",
+  "name": "videoball",
   "version": "1.0.0",
   "private": true,
+
+  "imports": {
+    "@/": "./"
+  },
+
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
   },
+
   "dependencies": {
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
@@ -15,6 +21,7 @@
     "react": "latest",
     "react-dom": "latest"
   },
+
   "devDependencies": {
     "typescript": "latest",
     "@types/react": "latest",
