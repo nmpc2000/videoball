@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function Page(){return <main className="landing"><div className="brand">COACH<span>VISION</span></div><h1>Analisa o jogo. Melhora a equipa.</h1><p>Vídeo, eventos e notas num só lugar. Carrega jogos diretamente do telemóvel e continua a análise no computador.</p><Link className="primary" href="/auth">Começar</Link></main>}
