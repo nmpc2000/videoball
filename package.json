@@ -4,7 +4,7 @@
   "private": true,
 
   "imports": {
-    "@/": "./"
+    "@/*": "./*"
   },
 
   "scripts": {
