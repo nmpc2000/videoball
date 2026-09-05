@@ -11,12 +11,11 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
 
-    "baseUrl": ".",
+    "jsx": "react-jsx",
+
     "paths": {
-      "@/*": ["./*"]
+      "*": ["./*"]
     },
 
     "plugins": [
@@ -27,6 +26,7 @@
   "include": [
     "next-env.d.ts",
     ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
     "**/*.ts",
     "**/*.tsx"
   ],
