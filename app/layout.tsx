@@ -11,7 +11,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="pt">
       <body className={inter.className}>
-        <div className="flex min-h-screen bg-gray-100">
+        <div className="flex min-h-screen">
 
           {/* SIDEBAR */}
           <aside className="w-64 bg-gray-900 text-white flex flex-col p-6 gap-8">
@@ -37,7 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </aside>
 
           {/* CONTEÚDO PRINCIPAL */}
-          <main className="flex-1 p-10">
+          <main className="flex-1 bg-gray-100 p-10">
             {children}
           </main>
 
