@@ -1,31 +1,51 @@
-import { inviteToTeam } from "./actions";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { inviteToTeam } from "./actions";
 
-async function getData() {
-  const sb = createServerClient(
+function supabase() {
+  const cookieStore = cookies(); // Next 16
+
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    { cookies }
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {}
+        }
+      }
+    }
   );
+}
 
+async function getTeams() {
+  const sb = supabase();
   const { data: user } = await sb.auth.getUser();
+
+  if (!user?.user) return { teams: [], memberships: [] };
 
   const { data: teams } = await sb
     .from("teams")
     .select("id, name")
-    .eq("owner_id", user.user?.id);
+    .eq("owner_id", user.user.id);
 
   const { data: memberships } = await sb
     .from("team_members")
     .select("team_id")
-    .eq("user_id", user.user?.id);
+    .eq("user_id", user.user.id);
 
-  return { teams, memberships };
+  return { teams: teams || [], memberships: memberships || [] };
 }
 
 export default async function TeamsPage() {
-  const { teams } = await getData();
+  const { teams } = await getTeams();
 
   async function handleInvite(formData: FormData) {
     "use server";
@@ -36,18 +56,22 @@ export default async function TeamsPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Equipas</h1>
+      <h1 className="text-2xl font-bold mb-6">Equipas</h1>
 
-      {teams?.map(team => (
-        <div key={team.id} className="border p-4 rounded mb-4">
-          <h2 className="text-xl font-semibold">{team.name}</h2>
+      {teams.length === 0 && (
+        <p className="text-gray-500">Ainda não tens equipas criadas.</p>
+      )}
 
-          <form action={handleInvite} className="mt-4 flex gap-2">
-            <input
-              type="hidden"
-              name="teamId"
-              value={team.id}
-            />
+      {teams.map((team) => (
+        <div
+          key={team.id}
+          className="border rounded-lg p-4 mb-6 bg-white shadow-sm"
+        >
+          <h2 className="text-xl font-semibold mb-2">{team.name}</h2>
+
+          <form action={handleInvite} className="flex gap-2 mt-4">
+            <input type="hidden" name="teamId" value={team.id} />
+
             <input
               type="email"
               name="email"
@@ -55,9 +79,10 @@ export default async function TeamsPage() {
               className="border p-2 rounded flex-1"
               required
             />
+
             <button
               type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded"
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
             >
               Convidar
             </button>
