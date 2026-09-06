@@ -1,32 +1,8 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import { inviteToTeam } from "./actions";
 
-function supabase() {
-  const cookieStore = cookies(); // Next 16
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {}
-        }
-      }
-    }
-  );
-}
-
 async function getTeams() {
-  const sb = supabase();
+  const sb = await createClient();
   const { data: user } = await sb.auth.getUser();
 
   if (!user?.user) return { teams: [], memberships: [] };
