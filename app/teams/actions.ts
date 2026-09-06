@@ -1,44 +1,22 @@
 "use server";
 
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-
-function supabase() {
-  const cookieStore = cookies(); // Next 16: sem await
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {}
-        }
-      }
-    }
-  );
-}
+import { createClient } from "@/lib/supabase/server";
 
 export async function inviteToTeam(teamId: string, email: string) {
-  const sb = supabase();
+  const sb = await createClient();
   const { data: user } = await sb.auth.getUser();
+
+  if (!user?.user) return;
 
   await sb.from("team_invites").insert({
     team_id: teamId,
     email,
-    invited_by: user.user?.id
+    invited_by: user.user.id,
   });
 }
 
 export async function acceptInvite() {
-  const sb = supabase();
+  const sb = await createClient();
   const { data: user } = await sb.auth.getUser();
 
   if (!user?.user) return;
@@ -54,7 +32,7 @@ export async function acceptInvite() {
   for (const invite of invites) {
     await sb.from("team_members").insert({
       team_id: invite.team_id,
-      user_id: user.user.id
+      user_id: user.user.id,
     });
 
     await sb
