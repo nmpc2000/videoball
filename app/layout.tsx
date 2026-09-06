@@ -1,3 +1,18 @@
 import "./globals.css";
-export const metadata={title:"Coach Vision",description:"Plataforma de análise de vídeo de futebol"};
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="pt"><body>{children}</body></html>}
+import { Inter } from "next/font/google";
+import { acceptInvite } from "./teams/actions";
+
+const inter = Inter({ subsets: ["latin"] });
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Aceita automaticamente convites de equipa quando o utilizador faz login
+  await acceptInvite();
+
+  return (
+    <html lang="pt">
+      <body className={inter.className}>
+        {children}
+      </body>
+    </html>
+  );
+}
