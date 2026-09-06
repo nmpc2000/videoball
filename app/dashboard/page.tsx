@@ -10,7 +10,13 @@ interface Game {
   video_name?: string | null;
   video_size?: number | null;
   user_id: string;
-  created_at: string;
+  team_id?: string | null;
+  teams?: { name: string } | null;
+}
+
+interface Team {
+  id: string;
+  name: string;
 }
 
 export default async function Dashboard() {
@@ -19,15 +25,25 @@ export default async function Dashboard() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (!user) return null;
+
+  // Carrega as equipas do utilizador
+  const { data: teams } = await supabase
+    .from("teams")
+    .select("id, name")
+    .order("name", { ascending: true });
+
+  // Carrega os jogos próprios ou das equipas
   const { data: games } = await supabase
     .from("games")
-    .select("*")
+    .select("*, teams(name)")
     .order("game_date", { ascending: false });
 
   return (
     <DashboardClient
       userEmail={user?.email || ""}
-      initialGames={(games as Game[]) || []}
+      initialGames={(games as unknown as Game[]) || []}
+      teams={(teams as Team[]) || []}
     />
   );
 }
