@@ -6,28 +6,27 @@ import { acceptInvite } from "./teams/actions";
 const inter = Inter({ subsets: ["latin"] });
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // Aceita convites automaticamente ao iniciar sessão
   await acceptInvite();
 
   return (
     <html lang="pt">
       <body className={inter.className}>
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen bg-gray-100">
 
           {/* SIDEBAR */}
-          <aside className="w-64 bg-gray-900 text-white p-6 flex flex-col gap-6">
-            <h1 className="text-xl font-bold">Coach Vision</h1>
+          <aside className="w-64 bg-gray-900 text-white flex flex-col p-6 gap-8">
+            <h1 className="text-2xl font-bold tracking-wide">videoball</h1>
 
-            <nav className="flex flex-col gap-4">
-              <Link href="/dashboard" className="hover:text-blue-400">
+            <nav className="flex flex-col gap-4 text-lg">
+              <Link href="/dashboard" className="hover:text-blue-400 transition">
                 Jogos
               </Link>
 
-              <Link href="/teams" className="hover:text-blue-400">
+              <Link href="/teams" className="hover:text-blue-400 transition">
                 Equipas
               </Link>
 
-              <Link href="/calendar" className="hover:text-blue-400">
+              <Link href="/calendar" className="hover:text-blue-400 transition">
                 Calendário
               </Link>
             </nav>
@@ -38,7 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </aside>
 
           {/* CONTEÚDO PRINCIPAL */}
-          <main className="flex-1 bg-gray-100 p-8">
+          <main className="flex-1 p-10">
             {children}
           </main>
 
