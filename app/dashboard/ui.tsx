@@ -18,14 +18,23 @@ interface Game {
   name: string;
   opponent?: string | null;
   game_date: string;
+  team_id?: string | null;
+  teams?: { name: string } | null;
+}
+
+interface Team {
+  id: string;
+  name: string;
 }
 
 export default function DashboardClient({
   userEmail,
   initialGames,
+  teams = [],
 }: {
   userEmail: string;
   initialGames: Game[];
+  teams?: Team[];
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -33,6 +42,7 @@ export default function DashboardClient({
   const [show, setShow] = useState(false);
   const [name, setName] = useState("");
   const [opponent, setOpponent] = useState("");
+  const [selectedTeam, setSelectedTeam] = useState<string>("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [busy, setBusy] = useState(false);
 
@@ -55,8 +65,9 @@ export default function DashboardClient({
         name: name || "Novo jogo",
         opponent,
         game_date: date,
+        team_id: selectedTeam || null,
       })
-      .select()
+      .select("*, teams(name)")
       .single();
 
     if (error) {
@@ -66,6 +77,7 @@ export default function DashboardClient({
       setShow(false);
       setName("");
       setOpponent("");
+      setSelectedTeam("");
       router.push("/games/" + data.id);
     }
     setBusy(false);
@@ -115,8 +127,8 @@ export default function DashboardClient({
             <b>{games.length}</b>
           </div>
           <div>
-            <span>Clips</span>
-            <b>0</b>
+            <span>Equipas</span>
+            <b>{teams.length}</b>
           </div>
           <div>
             <span>Eventos</span>
@@ -147,6 +159,18 @@ export default function DashboardClient({
                   <h3>{g.name}</h3>
                   <p>
                     {g.opponent || "Adversário por definir"} · {g.game_date}
+                    {g.teams?.name && (
+                      <span
+                        style={{
+                          display: "block",
+                          color: "#38bdf8",
+                          fontSize: "12px",
+                          marginTop: "2px",
+                        }}
+                      >
+                        👥 {g.teams.name}
+                      </span>
+                    )}
                   </p>
                 </div>
                 <ChevronRight />
@@ -162,13 +186,35 @@ export default function DashboardClient({
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Nome do jogo"
+                placeholder="Nome do jogo (ex: Amigável 1)"
               />
               <input
                 value={opponent}
                 onChange={(e) => setOpponent(e.target.value)}
                 placeholder="Adversário"
               />
+
+              {teams.length > 0 && (
+                <select
+                  value={selectedTeam}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  style={{
+                    background: "#191c22",
+                    border: "1px solid #2b3039",
+                    color: "#fff",
+                    borderRadius: "9px",
+                    padding: "12px",
+                  }}
+                >
+                  <option value="">Sem equipa (Privado)</option>
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      Equipa: {t.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+
               <input
                 type="date"
                 value={date}
