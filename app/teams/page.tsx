@@ -12,206 +12,61 @@ interface Team {
   id: string;
   name: string;
   owner_id: string;
-  created_at: string;
-}
-
-interface Member {
-  id: string;
-  user_id: string;
-  role: string;
-  profile?: {
-    full_name: string | null;
-    email: string | null;
-  } | null;
 }
 
 interface Invite {
   id: string;
   team_id: string;
   email: string;
-  accepted: boolean;
-  created_at: string;
-  team?: {
-    id: string;
-    name: string;
-  } | null;
+  teams?: { name: string } | null;
 }
 
-async function getData() {
+async function getTeamsData() {
   const sb = await createClient();
-
   const {
     data: { user },
   } = await sb.auth.getUser();
 
-  if (!user) {
-    return {
-      user: null,
-      teams: [] as Team[],
-      members: {} as Record<string, Member[]>,
-      invites: [] as Invite[],
-    };
-  }
+  if (!user) return { user: null, teams: [] as Team[], invites: [] as Invite[] };
 
-  // Equipas onde sou dono
-  const { data: ownedTeams } = await sb
+  const { data: teams } = await sb
     .from("teams")
-    .select("id, name, owner_id, created_at")
-    .eq("owner_id", user.id)
+    .select("id, name, owner_id")
     .order("created_at", { ascending: false });
 
-  // Equipas onde sou membro
-  const { data: memberships } = await sb
-    .from("team_members")
-    .select("team_id")
-    .eq("user_id", user.id);
-
-  const memberTeamIds =
-    memberships?.map((membership) => membership.team_id) || [];
-
-  let memberTeams: Team[] = [];
-
-  if (memberTeamIds.length > 0) {
-    const { data } = await sb
-      .from("teams")
-      .select("id, name, owner_id, created_at")
-      .in("id", memberTeamIds)
-      .order("created_at", { ascending: false });
-
-    memberTeams = data || [];
-  }
-
-  // Juntar sem duplicados
-  const allTeams = [...(ownedTeams || []), ...memberTeams];
-
-  const teams = Array.from(
-    new Map(allTeams.map((team) => [team.id, team])).values()
-  );
-
-  // Buscar membros de cada equipa
-  const members: Record<string, Member[]> = {};
-
-  for (const team of teams) {
-    const { data: teamMembers } = await sb
-      .from("team_members")
-      .select(
-        `
-        id,
-        user_id,
-        role,
-        profiles (
-          full_name,
-          email
-        )
-      `
-      )
-      .eq("team_id", team.id)
-      .order("created_at", { ascending: true });
-
-    members[team.id] = (teamMembers || []).map((member: any) => ({
-      id: member.id,
-      user_id: member.user_id,
-      role: member.role,
-      profile: Array.isArray(member.profiles)
-        ? member.profiles[0] || null
-        : member.profiles || null,
-    }));
-  }
-
-  // Convites recebidos
   const { data: invites } = await sb
     .from("team_invites")
-    .select(
-      `
-      id,
-      team_id,
-      email,
-      accepted,
-      created_at,
-      teams (
-        id,
-        name
-      )
-    `
-    )
-    .eq("email", user.email?.toLowerCase() || "")
-    .eq("accepted", false)
-    .order("created_at", { ascending: false });
-
-  const formattedInvites = (invites || []).map((invite: any) => ({
-    id: invite.id,
-    team_id: invite.team_id,
-    email: invite.email,
-    accepted: invite.accepted,
-    created_at: invite.created_at,
-    team: Array.isArray(invite.teams)
-      ? invite.teams[0] || null
-      : invite.teams || null,
-  }));
+    .select("id, team_id, email, teams(name)")
+    .eq("email", user.email || "")
+    .eq("accepted", false);
 
   return {
     user,
-    teams,
-    members,
-    invites: formattedInvites,
+    teams: (teams || []) as Team[],
+    invites: (invites || []) as unknown as Invite[],
   };
 }
 
 export default async function TeamsPage() {
-  const { user, teams, members, invites } = await getData();
-
-  async function handleCreateTeam(formData: FormData) {
-    "use server";
-
-    const name = String(formData.get("name") || "");
-
-    await createTeam(name);
-  }
+  const { user, teams, invites } = await getTeamsData();
 
   async function handleInvite(formData: FormData) {
     "use server";
-
-    const teamId = String(formData.get("teamId") || "");
-    const email = String(formData.get("email") || "");
-
+    const email = formData.get("email") as string;
+    const teamId = formData.get("teamId") as string;
     await inviteToTeam(teamId, email);
   }
 
-  async function handleAcceptInvite(formData: FormData) {
+  async function handleAccept(formData: FormData) {
     "use server";
-
-    const inviteId = String(formData.get("inviteId") || "");
-
+    const inviteId = formData.get("inviteId") as string;
     await acceptInvite(inviteId);
   }
 
-  async function handleLeaveTeam(formData: FormData) {
+  async function handleLeave(formData: FormData) {
     "use server";
-
-    const teamId = String(formData.get("teamId") || "");
-
+    const teamId = formData.get("teamId") as string;
     await leaveTeam(teamId);
-  }
-
-  if (!user) {
-    return (
-      <main
-        className="content"
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div className="empty">
-          <h2>Tens de iniciar sessão.</h2>
-          <Link href="/auth" className="primary">
-            Entrar
-          </Link>
-        </div>
-      </main>
-    );
   }
 
   return (
@@ -219,20 +74,12 @@ export default async function TeamsPage() {
       className="content"
       style={{
         minHeight: "100vh",
-        maxWidth: "1000px",
+        maxWidth: "800px",
         margin: "0 auto",
-        padding: "40px 20px 80px",
+        padding: "40px 20px",
       }}
     >
-      {/* HEADER */}
-      <header
-        className="topbar"
-        style={{
-          marginBottom: "35px",
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
+      <header className="topbar" style={{ marginBottom: "24px" }}>
         <Link
           href="/dashboard"
           style={{
@@ -240,224 +87,59 @@ export default async function TeamsPage() {
             alignItems: "center",
             gap: "8px",
             color: "#aab1bc",
-            textDecoration: "none",
           }}
         >
-          <ArrowLeft size={18} />
-          Voltar ao Dashboard
+          <ArrowLeft size={18} /> Voltar ao Dashboard
         </Link>
       </header>
 
-      {/* TITLE */}
-      <div
+      <h1
         style={{
+          fontSize: "28px",
+          fontWeight: "bold",
+          marginBottom: "24px",
           display: "flex",
-          justifyContent: "space-between",
           alignItems: "center",
-          gap: "20px",
-          marginBottom: "30px",
+          gap: "10px",
         }}
       >
-        <div>
-          <h1
-            style={{
-              fontSize: "34px",
-              fontWeight: 700,
-              margin: 0,
-            }}
-          >
-            Equipas
-          </h1>
+        <Users size={28} /> Equipas
+      </h1>
 
-          <p
-            style={{
-              color: "#8e96a3",
-              marginTop: "8px",
-              marginBottom: 0,
-            }}
-          >
-            Gere as tuas equipas e trabalha em conjunto com outros analistas.
-          </p>
-        </div>
-      </div>
-
-      {/* CREATE TEAM */}
-      <section
-        style={{
-          background: "#111318",
-          border: "1px solid #242932",
-          borderRadius: "16px",
-          padding: "24px",
-          marginBottom: "25px",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            marginBottom: "18px",
-          }}
-        >
-          <div
-            style={{
-              width: "38px",
-              height: "38px",
-              borderRadius: "10px",
-              background: "#1b1f27",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Plus size={20} />
-          </div>
-
-          <div>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: "18px",
-              }}
-            >
-              Criar nova equipa
-            </h2>
-
-            <p
-              style={{
-                margin: "4px 0 0",
-                color: "#7f8794",
-                fontSize: "14px",
-              }}
-            >
-              Cria uma equipa para poderes partilhar jogos e análises.
-            </p>
-          </div>
-        </div>
-
-        <form
-          action={handleCreateTeam}
-          style={{
-            display: "flex",
-            gap: "10px",
-          }}
-        >
-          <input
-            type="text"
-            name="name"
-            placeholder="Nome da equipa, ex.: SC Braga Sub-15"
-            required
-            style={{
-              flex: 1,
-              background: "#191c22",
-              border: "1px solid #2b3039",
-              color: "#fff",
-              borderRadius: "9px",
-              padding: "12px 14px",
-              outline: "none",
-            }}
-          />
-
-          <button
-            type="submit"
-            className="primary"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "7px",
-            }}
-          >
-            <Plus size={17} />
-            Criar equipa
-          </button>
-        </form>
-      </section>
-
-      {/* PENDING INVITES */}
-      {invites.length > 0 && (
-        <section
-          style={{
-            background: "#111318",
-            border: "1px solid #313741",
-            borderRadius: "16px",
-            padding: "24px",
-            marginBottom: "25px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              marginBottom: "18px",
-            }}
-          >
-            <Mail size={20} />
-
-            <h2
-              style={{
-                margin: 0,
-                fontSize: "19px",
-              }}
-            >
-              Convites pendentes
-            </h2>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gap: "12px",
-            }}
-          >
-            {invites.map((invite) => (
+      {/* Secção de Convites Pendentes */}
+      {invites && invites.length > 0 && (
+        <section style={{ marginBottom: "32px" }}>
+          <h2 style={{ fontSize: "18px", color: "#8d96a6", marginBottom: "12px" }}>
+            Convites Pendentes
+          </h2>
+          <div style={{ display: "grid", gap: "10px" }}>
+            {invites.map((inv) => (
               <div
-                key={invite.id}
+                key={inv.id}
                 style={{
-                  background: "#191c22",
-                  border: "1px solid #2b3039",
+                  background: "#171c26",
+                  border: "1px solid #29384d",
                   borderRadius: "12px",
                   padding: "16px",
                   display: "flex",
-                  alignItems: "center",
                   justifyContent: "space-between",
-                  gap: "15px",
+                  alignItems: "center",
                 }}
               >
                 <div>
-                  <strong>
-                    {invite.team?.name || "Equipa"}
-                  </strong>
-
-                  <div
-                    style={{
-                      color: "#8e96a3",
-                      fontSize: "13px",
-                      marginTop: "4px",
-                    }}
-                  >
-                    Foste convidado para esta equipa.
-                  </div>
+                  <b>{inv.teams?.name || "Nova Equipa"}</b>
+                  <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#8d96a6" }}>
+                    Foste convidado para esta equipa
+                  </p>
                 </div>
-
-                <form action={handleAcceptInvite}>
-                  <input
-                    type="hidden"
-                    name="inviteId"
-                    value={invite.id}
-                  />
-
+                <form action={handleAccept}>
+                  <input type="hidden" name="inviteId" value={inv.id} />
                   <button
                     type="submit"
                     className="primary"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "7px",
-                    }}
+                    style={{ background: "#22c55e", color: "#fff" }}
                   >
-                    <Check size={17} />
-                    Aceitar
+                    <Check size={16} /> Aceitar
                   </button>
                 </form>
               </div>
@@ -466,362 +148,107 @@ export default async function TeamsPage() {
         </section>
       )}
 
-      {/* TEAMS */}
-      {teams.length === 0 ? (
-        <div
+      {/* Criar Nova Equipa */}
+      <section style={{ marginBottom: "32px" }}>
+        <form
+          action={createTeam}
           style={{
-            border: "1px dashed #343a45",
-            borderRadius: "18px",
-            minHeight: "420px",
+            background: "#111318",
+            border: "1px solid #242932",
+            borderRadius: "14px",
+            padding: "20px",
             display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            textAlign: "center",
-            padding: "40px",
+            gap: "10px",
           }}
         >
-          <div
+          <input
+            type="text"
+            name="name"
+            placeholder="Nome da nova equipa..."
             style={{
-              width: "64px",
-              height: "64px",
-              borderRadius: "18px",
-              background: "#16191f",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: "20px",
+              background: "#191c22",
+              border: "1px solid #2b3039",
+              color: "#fff",
+              borderRadius: "9px",
+              padding: "10px 14px",
+              flex: 1,
             }}
-          >
-            <Users size={30} />
+            required
+          />
+          <button type="submit" className="primary">
+            <Plus size={18} /> Criar Equipa
+          </button>
+        </form>
+      </section>
+
+      {/* Lista de Equipas */}
+      <div style={{ display: "grid", gap: "16px" }}>
+        {teams.length === 0 ? (
+          <div className="empty">
+            <h2>Ainda não tens equipas.</h2>
+            <p>Cria uma equipa acima para começares a colaborar.</p>
           </div>
-
-          <h2
-            style={{
-              margin: 0,
-              fontSize: "22px",
-            }}
-          >
-            Ainda não tens equipas
-          </h2>
-
-          <p
-            style={{
-              color: "#858d99",
-              maxWidth: "450px",
-              lineHeight: 1.6,
-              marginTop: "10px",
-            }}
-          >
-            Cria a tua primeira equipa e depois podes convidar treinadores,
-            analistas ou outros membros.
-          </p>
-        </div>
-      ) : (
-        <div
-          style={{
-            display: "grid",
-            gap: "20px",
-          }}
-        >
-          {teams.map((team) => {
-            const isOwner = team.owner_id === user.id;
-            const teamMembers = members[team.id] || [];
-
-            return (
-              <section
-                key={team.id}
+        ) : (
+          teams.map((team) => (
+            <div
+              key={team.id}
+              style={{
+                background: "#111318",
+                border: "1px solid #242932",
+                borderRadius: "14px",
+                padding: "20px",
+              }}
+            >
+              <div
                 style={{
-                  background: "#111318",
-                  border: "1px solid #242932",
-                  borderRadius: "16px",
-                  overflow: "hidden",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "16px",
                 }}
               >
-                {/* TEAM HEADER */}
-                <div
-                  style={{
-                    padding: "22px 24px",
-                    borderBottom: "1px solid #242932",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "15px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "13px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "44px",
-                        height: "44px",
-                        borderRadius: "12px",
-                        background: "#1b1f27",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
+                <h2 style={{ fontSize: "18px", fontWeight: 600, margin: 0 }}>
+                  {team.name}
+                </h2>
+                {team.owner_id !== user?.id && (
+                  <form action={handleLeave}>
+                    <input type="hidden" name="teamId" value={team.id} />
+                    <button
+                      type="submit"
+                      className="ghost"
+                      style={{ color: "#ef4444", borderColor: "#7f1d1d" }}
                     >
-                      <Users size={22} />
-                    </div>
-
-                    <div>
-                      <h2
-                        style={{
-                          margin: 0,
-                          fontSize: "20px",
-                        }}
-                      >
-                        {team.name}
-                      </h2>
-
-                      <span
-                        style={{
-                          color: "#7f8794",
-                          fontSize: "13px",
-                        }}
-                      >
-                        {teamMembers.length}{" "}
-                        {teamMembers.length === 1
-                          ? "membro"
-                          : "membros"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {isOwner && (
-                    <span
-                      style={{
-                        background: "#1d222a",
-                        border: "1px solid #303640",
-                        borderRadius: "20px",
-                        padding: "6px 11px",
-                        fontSize: "12px",
-                        color: "#c7ccd4",
-                      }}
-                    >
-                      Dono
-                    </span>
-                  )}
-                </div>
-
-                {/* INVITE */}
-                {isOwner && (
-                  <div
-                    style={{
-                      padding: "22px 24px",
-                      borderBottom: "1px solid #242932",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        marginBottom: "12px",
-                      }}
-                    >
-                      <Mail size={17} />
-
-                      <strong
-                        style={{
-                          fontSize: "15px",
-                        }}
-                      >
-                        Convidar membro
-                      </strong>
-                    </div>
-
-                    <form
-                      action={handleInvite}
-                      style={{
-                        display: "flex",
-                        gap: "10px",
-                      }}
-                    >
-                      <input
-                        type="hidden"
-                        name="teamId"
-                        value={team.id}
-                      />
-
-                      <input
-                        type="email"
-                        name="email"
-                        placeholder="Email do treinador ou analista"
-                        required
-                        style={{
-                          flex: 1,
-                          background: "#191c22",
-                          border: "1px solid #2b3039",
-                          color: "#fff",
-                          borderRadius: "9px",
-                          padding: "11px 14px",
-                        }}
-                      />
-
-                      <button
-                        type="submit"
-                        className="primary"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "7px",
-                        }}
-                      >
-                        <Mail size={17} />
-                        Convidar
-                      </button>
-                    </form>
-
-                    <p
-                      style={{
-                        color: "#707885",
-                        fontSize: "12px",
-                        margin: "9px 0 0",
-                      }}
-                    >
-                      O convite ficará disponível para esse email assim que
-                      a pessoa iniciar sessão.
-                    </p>
-                  </div>
+                      <LogOut size={16} /> Sair
+                    </button>
+                  </form>
                 )}
+              </div>
 
-                {/* MEMBERS */}
-                <div
+              {/* Form de Convidar */}
+              <form action={handleInvite} style={{ display: "flex", gap: "10px" }}>
+                <input type="hidden" name="teamId" value={team.id} />
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="Email do treinador a convidar..."
                   style={{
-                    padding: "22px 24px",
+                    background: "#191c22",
+                    border: "1px solid #2b3039",
+                    color: "#fff",
+                    borderRadius: "9px",
+                    padding: "10px 14px",
+                    flex: 1,
                   }}
-                >
-                  <h3
-                    style={{
-                      margin: "0 0 15px",
-                      fontSize: "15px",
-                    }}
-                  >
-                    Membros
-                  </h3>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gap: "8px",
-                    }}
-                  >
-                    {teamMembers.map((member) => {
-                      const name =
-                        member.profile?.full_name ||
-                        member.profile?.email ||
-                        "Utilizador";
-
-                      const isCurrentUser = member.user_id === user.id;
-
-                      return (
-                        <div
-                          key={member.id}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            background: "#191c22",
-                            border: "1px solid #272c35",
-                            borderRadius: "10px",
-                            padding: "12px 14px",
-                          }}
-                        >
-                          <div>
-                            <div
-                              style={{
-                                fontSize: "14px",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {name}
-                              {isCurrentUser && (
-                                <span
-                                  style={{
-                                    color: "#737c89",
-                                    fontWeight: 400,
-                                    marginLeft: "7px",
-                                  }}
-                                >
-                                  (tu)
-                                </span>
-                              )}
-                            </div>
-
-                            {member.profile?.email && (
-                              <div
-                                style={{
-                                  color: "#727a87",
-                                  fontSize: "12px",
-                                  marginTop: "3px",
-                                }}
-                              >
-                                {member.profile.email}
-                              </div>
-                            )}
-                          </div>
-
-                          <span
-                            style={{
-                              color: "#8e96a3",
-                              fontSize: "12px",
-                              textTransform: "capitalize",
-                            }}
-                          >
-                            {member.role === "owner"
-                              ? "Dono"
-                              : member.role}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {!isOwner && (
-                    <form
-                      action={handleLeaveTeam}
-                      style={{
-                        marginTop: "18px",
-                      }}
-                    >
-                      <input
-                        type="hidden"
-                        name="teamId"
-                        value={team.id}
-                      />
-
-                      <button
-                        type="submit"
-                        style={{
-                          background: "transparent",
-                          border: "1px solid #383e48",
-                          color: "#aeb5bf",
-                          borderRadius: "9px",
-                          padding: "9px 13px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "7px",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <LogOut size={15} />
-                        Sair da equipa
-                      </button>
-                    </form>
-                  )}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      )}
+                  required
+                />
+                <button type="submit" className="primary">
+                  <Mail size={16} /> Convidar
+                </button>
+              </form>
+            </div>
+          ))
+        )}
+      </div>
     </main>
   );
 }
