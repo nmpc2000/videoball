@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 interface GameItem {
   id: string;
@@ -28,34 +30,54 @@ export default async function CalendarPage() {
   const { games } = await getCalendarData();
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Calendário</h1>
+    <main className="content" style={{ minHeight: "100vh", maxWidth: "800px", margin: "0 auto", padding: "40px 20px" }}>
+      <header className="topbar" style={{ marginBottom: "24px" }}>
+        <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "8px", color: "#aab1bc" }}>
+          <ArrowLeft size={18} /> Voltar ao Dashboard
+        </Link>
+      </header>
 
-      {games.length === 0 && (
-        <p className="text-gray-500">Ainda não tens jogos no calendário.</p>
+      <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "24px" }}>Calendário</h1>
+
+      {games.length === 0 ? (
+        <div className="empty">
+          <h2>Ainda não tens jogos no calendário.</h2>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: "12px" }}>
+          {games.map((game: GameItem) => {
+            const displayTitle = game.name || game.title || "Jogo";
+            const displayDate = game.game_date || game.date;
+
+            return (
+              <div
+                key={game.id}
+                style={{
+                  background: "#111318",
+                  border: "1px solid #242932",
+                  borderRadius: "14px",
+                  padding: "18px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center"
+                }}
+              >
+                <div>
+                  <h2 style={{ fontSize: "16px", fontWeight: 600, margin: "0 0 4px 0" }}>{displayTitle}</h2>
+                  <p style={{ color: "#808895", fontSize: "13px", margin: 0 }}>
+                    {game.opponent || "Sem adversário"}
+                  </p>
+                </div>
+                {displayDate && (
+                  <span style={{ color: "#aeb5c0", fontSize: "14px", fontVariantNumeric: "tabular-nums" }}>
+                    {new Date(displayDate).toLocaleDateString("pt-PT")}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
-
-      <div className="flex flex-col gap-4">
-        {games.map((game: GameItem) => {
-          const displayTitle = game.name || game.title || "Jogo";
-          const displayDate = game.game_date || game.date;
-
-          return (
-            <div
-              key={game.id}
-              className="border rounded-lg p-4 bg-white shadow-sm"
-            >
-              <h2 className="text-xl font-semibold">{displayTitle}</h2>
-              <p className="text-gray-600">{game.opponent || "Sem adversário"}</p>
-              {displayDate && (
-                <p className="text-gray-500 mt-2">
-                  {new Date(displayDate).toLocaleDateString("pt-PT")}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    </main>
   );
 }
